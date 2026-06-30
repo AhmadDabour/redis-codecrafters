@@ -92,8 +92,11 @@ func handleConnection(c net.Conn) {
 				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(res), res)))
 			}
 		case "rpush":
+			items := len(result) - 2
 			mu.Lock()
+			for i := 0; i < items; i++ { 
 			listData[result[1]] = append(listData[result[1]], result[2])
+			}
 			mu.Unlock()
 			c.Write([]byte(fmt.Sprintf(":%d\r\n", len(listData[result[1]]))))
 		}
