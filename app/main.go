@@ -92,13 +92,35 @@ func handleConnection(c net.Conn) {
 				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(res), res)))
 			}
 		case "rpush":
-			items := len(result) - 2
 			mu.Lock()
-			for i := 0; i < items; i++ { 
-			listData[result[1]] = append(listData[result[1]], result[2])
+			for i := 2; i < len(result); i++ { 
+			listData[result[1]] = append(listData[result[1]], result[i])
 			}
 			mu.Unlock()
 			c.Write([]byte(fmt.Sprintf(":%d\r\n", len(listData[result[1]]))))
+		case "lrange":
+			lower, _ := strconv.ParseInt(result[2], 10, 64)
+			upper, _ := strconv.ParseInt(result[3], 10, 64)
+			if _, ok := listData[result[1]]; !ok {
+				c.Write([]byte("*0\r\n"))
+				continue
+			}
+			if int(upper) > len(listData[result[1]]) {
+				upper = int64(len(listData[result[1]])) - 1
+			}
+			if lower > upper {
+				c.Write([]byte("*0\r\n"))
+				continue
+			} else if int(lower) > len(listData[result[1]]) {
+				c.Write([]byte("*0\r\n"))
+				continue
+			}
+			amount := (upper - lower) + 1
+			res := fmt.Sprintf("*%d\r\n", amount)
+			for i := lower; i <= upper; i++ {
+				res += fmt.Sprintf("$%d\r\n%s\r\n", len(listData[result[1]][i]), listData[result[1]][i])
+			}
+			c.Write([]byte(res))
 		}
 	}
 }
