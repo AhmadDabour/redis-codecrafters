@@ -36,8 +36,11 @@ func handleConnection(c net.Conn)  {
 	buff := make([]byte, 1024)
 	for {
 		n, err := c.Read(buff)
-		fmt.Sprintf("%b %s\n", n, string(buff[:n]))
-		if err != nil && err != io.EOF {
+	//	fmt.Printf("%d %s\n", n, string(buff[:n]))
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
 			fmt.Println("Error reading input: ", err.Error())
 			break
 		}
