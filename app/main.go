@@ -15,7 +15,8 @@ import (
 
 var _ = net.Listen
 var _ = os.Exit
-var data = make(map[string]string)
+var varData = make(map[string]string)
+var listData = make(map[string][]string)
 var mu sync.Mutex
 
 func main() {	
@@ -54,7 +55,7 @@ func handleConnection(c net.Conn)  {
 				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(result[1]), result[1])))
 			case "set":
 				mu.Lock()
-				data[result[1]] = result[2]
+				varData[result[1]] = result[2]
 				mu.Unlock()
 				c.Write([]byte("+OK\r\n"))
 				if len(result) > 3 { 
@@ -65,7 +66,7 @@ func handleConnection(c net.Conn)  {
 						}
 						time.AfterFunc(time.Duration(ex)*time.Second, func() { 
 							mu.Lock()
-							delete(data, result[1])
+							delete(varData, result[1])
 							mu.Unlock()
 					})
 					}
@@ -76,20 +77,25 @@ func handleConnection(c net.Conn)  {
 						}
 						time.AfterFunc(time.Duration(ex)*time.Millisecond, func() {
 							mu.Lock()
-							delete(data, result[1])
+							delete(varData, result[1])
 							mu.Unlock()
 						})
 					}
 				}
 			case "get":
 				mu.Lock()
-				res, ok := data[result[1]]
+				res, ok := varData[result[1]]
 				mu.Unlock()
 				if !ok { 
 					c.Write([]byte("$-1\r\n"))
 				} else { 
 				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(res), res)))
 			}
+			case "rpush":
+				mu.Lock()
+				listData[result[1]] = append(listData[result[1]], result[2])
+				mu.Unlock()
+				c.Write([]byte(fmt.Sprintf(":%d\r\n", len(listData[result[1]]))))
 		}
 	}
 }
@@ -114,13 +120,14 @@ func respParser(buff string) []string{
 	if p != '$' {
 		fmt.Println("Error parsing command")
 	}
-	size, _ := reader.ReadByte()
+	sizeTemp, _ := reader.ReadString('\n')
+	size := strings.ReplaceAll(sizeTemp, "\r\n", "")
 	strSize, err := strconv.ParseInt(string(size), 10, 64)
 	if err != nil {
 		fmt.Println("Error parsing int: ", err.Error())
 	}
-	reader.ReadByte()
-	reader.ReadByte()
+	// reader.ReadByte()
+	// reader.ReadByte()
 	resp := make([]byte, strSize)
 	reader.Read(resp)
 	input = append(input, string(resp))
