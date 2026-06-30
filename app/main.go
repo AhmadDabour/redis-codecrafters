@@ -10,11 +10,13 @@ import (
 	"time"
 	"slices"
 	"io"
+	"sync"
 )
 
 var _ = net.Listen
 var _ = os.Exit
 var data = make(map[string]string)
+var mu sync.Mutex
 
 func main() {	
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
@@ -51,7 +53,9 @@ func handleConnection(c net.Conn)  {
 			case "echo":
 				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(result[1]), result[1])))
 			case "set":
+				mu.Lock()
 				data[result[1]] = result[2]
+				mu.Unlock()
 				c.Write([]byte("+OK\r\n"))
 				if len(result) > 3 { 
 					if result[3] == "ex" {
@@ -60,7 +64,9 @@ func handleConnection(c net.Conn)  {
 							fmt.Println("Error parsing int")
 						}
 						time.AfterFunc(time.Duration(ex)*time.Second, func() { 
+							mu.Lock()
 							delete(data, result[1])
+							mu.Unlock()
 					})
 					}
 					if result[3] == "px" {
@@ -69,12 +75,17 @@ func handleConnection(c net.Conn)  {
 							fmt.Println("Error parsing int")
 						}
 						time.AfterFunc(time.Duration(ex)*time.Millisecond, func() {
+							mu.Lock()
 							delete(data, result[1])
+							mu.Unlock()
 						})
 					}
 				}
 			case "get":
-				if res, ok := data[result[1]]; !ok {
+				mu.Lock()
+				res, ok := data[result[1]]
+				mu.Unlock()
+				if !ok { 
 					c.Write([]byte("$-1\r\n"))
 				} else { 
 				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(res), res)))
