@@ -101,20 +101,31 @@ func handleConnection(c net.Conn) {
 		case "lrange":
 			lower, _ := strconv.ParseInt(result[2], 10, 64)
 			upper, _ := strconv.ParseInt(result[3], 10, 64)
+			if int(upper) > len(listData[result[1]]) {
+				upper = int64(len(listData[result[1]])) - 1
+			} else if int(((upper * -1) - 1)) >= len(listData[result[1]]) {
+				upper = 0
+				continue
+			}
+			if int(lower) > len(listData[result[1]]) {
+				c.Write([]byte("*0\r\n"))
+			} else if int(((lower * -1) - 1)) >= len(listData[result[1]]) {
+				lower = 0
+			}
+			if lower < 0 {
+				lower = int64(len(listData[result[1]])) + lower
+			}
+			if upper < 0 {
+				upper = int64(len(listData[result[1]])) + upper
+			}
 			if _, ok := listData[result[1]]; !ok {
 				c.Write([]byte("*0\r\n"))
 				continue
 			}
-			if int(upper) > len(listData[result[1]]) {
-				upper = int64(len(listData[result[1]])) - 1
-			}
 			if lower > upper {
 				c.Write([]byte("*0\r\n"))
 				continue
-			} else if int(lower) > len(listData[result[1]]) {
-				c.Write([]byte("*0\r\n"))
-				continue
-			}
+			} 
 			amount := (upper - lower) + 1
 			res := fmt.Sprintf("*%d\r\n", amount)
 			for i := lower; i <= upper; i++ {
