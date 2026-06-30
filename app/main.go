@@ -11,6 +11,7 @@ import (
 
 var _ = net.Listen
 var _ = os.Exit
+var data = make(map[string]string)
 
 func main() {	
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
@@ -33,43 +34,62 @@ func handleConnection(c net.Conn)  {
 	for {
 		n, err := c.Read(buff)
 		if err != nil {
-			fmt.Println("Error reading input: ", err.Error())
+			fmt.Println("Error reading input: ")
 			break
 		}
-		if strings.Contains(strings.ToLower(string(buff)), "echo") { 
-			go echoParser(string(buff[:n]), c)
-		}
-		resp := strings.Replace(string(buff[:n]), "\r\n", "", -1)
-		if strings.Contains(resp, "PING") {
-			c.Write([]byte("+PONG\r\n"))
-			continue
+		result := respParser(string(buff[:n]))
+		switch result[0] {
+			case "PING":
+				c.Write([]byte("+PONG\r\n"))
+			case "ECHO":
+				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(result[1]), result[1])))
+			case "SET":
+				data[result[1]] = result[2]
+				c.Write([]byte("+OK\r\n"))
+			case "GET":
+				if res, ok := data[result[1]]; !ok {
+					c.Write([]byte("$-1\r\n"))
+				} else { 
+				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(res), res)))
+			}
 		}
 	}
 }
 
-func echoParser(buff string, c net.Conn) {
+func respParser(buff string) []string{
 	reader := bufio.NewReader(strings.NewReader(buff))
-	for i := 0; i < 14; i++ {
-		reader.ReadByte()
+	s, _ := reader.ReadByte()
+	if s != '*' {
+		fmt.Println("Error parsing command")
+		return nil
 	}
-	
-	// s, _ := reader.Peek(1)
-	// if  s[0] == '*' {
-	// 	reader.ReadByte()
-	// 	reader.ReadByte()
-	// }
-	b, _ := reader.ReadByte()
-	if b != '$' {
-		fmt.Println("Invalid type")
-		os.Exit(1)
+	b, _ := reader.ReadByte() 
+	sliceSize, err := strconv.ParseInt(string(b), 10, 64)
+	if err != nil {
+		fmt.Println("Error parsing int: ", err.Error())
+	}
+	input := []string{}
+
+	for i := 0; i < int(sliceSize); i++ { 
+	reader.ReadByte()
+	reader.ReadByte()
+	p, _ := reader.ReadByte()
+	if p != '$' {
+		fmt.Println("Error parsing command")
+		return nil
 	}
 	size, _ := reader.ReadByte()
-	strSize, _ := strconv.ParseInt(string(size), 10, 64)
-
+	strSize, err := strconv.ParseInt(string(size), 10, 64)
+	if err != nil {
+		fmt.Println("Error parsing int: ", err.Error())
+		return nil
+	}
 	reader.ReadByte()
 	reader.ReadByte()
-
 	resp := make([]byte, strSize)
 	reader.Read(resp)
-	c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n",strSize, string(resp))))
+	input = append(input, string(resp))
+	}
+	strings.ToLower(input[0])
+	return input
 }
