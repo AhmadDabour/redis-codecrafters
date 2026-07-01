@@ -139,6 +139,8 @@ func handleConnection(c net.Conn) {
 			}
 			mu.Unlock()
 			c.Write([]byte(fmt.Sprintf(":%d\r\n", len(listData[result[1]]))))
+		case "llen":
+			c.Write([]byte(fmt.Sprintf(":%d\r\n", len(listData[result[1]]))))
 		}
 	}
 }
