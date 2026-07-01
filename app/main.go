@@ -19,6 +19,7 @@ var varData = make(map[string]string)
 var listData = make(map[string][]string)
 var mu sync.Mutex
 var cond *sync.Cond = sync.NewCond(&mu)
+var status bool = false
 
 func main() {
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
@@ -94,8 +95,8 @@ func handleConnection(c net.Conn) {
 			}
 		case "rpush":
 			mu.Lock()
-			for i := 2; i < len(result); i++ { 
-			listData[result[1]] = append(listData[result[1]], result[i])
+			for i := 2; i < len(result); i++ {
+				listData[result[1]] = append(listData[result[1]], result[i])
 			}
 			cond.Signal()
 			mu.Unlock()
@@ -127,7 +128,7 @@ func handleConnection(c net.Conn) {
 			if lower > upper {
 				c.Write([]byte("*0\r\n"))
 				continue
-			} 
+			}
 			amount := (upper - lower) + 1
 			res := fmt.Sprintf("*%d\r\n", amount)
 			for i := lower; i <= upper; i++ {
@@ -158,28 +159,80 @@ func handleConnection(c net.Conn) {
 					res += fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)
 				}
 				c.Write([]byte(res))
-			} else { 
+			} else {
 				del := listData[result[1]][0]
 				listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
 				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)))
-		}
+			}
 		case "blpop":
-			cond.L.Lock()
-			for {
-				if len(listData[result[1]]) == 0 {
-					cond.Wait()
-				} else {
-					break
+			sec, _ := strconv.ParseFloat(result[2], 64)
+			if sec == 0{	
+				cond.L.Lock()
+				for {
+					if len(listData[result[1]]) == 0 {
+						cond.Wait()
+					} else {
+						break
+					}
+				}
+				res := fmt.Sprintf("*2\r\n$%d\r\n%s\r\n", len(result[1]), result[1])
+				del := listData[result[1]][0]
+				
+				listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
+				cond.L.Unlock()
+				res += fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)
+				c.Write([]byte(res))
+			} else {
+				for {
+					timeout := time.After(time.Duration(sec) * time.Second)
+					if len(listData[result[1]]) == 0 {
+						select {
+							case <-timeout:
+								time.Sleep(500 * time.Millisecond)
+								if len(listData[result[1]]) == 0 {
+									c.Write([]byte("*-1\r\n"))
+								} else {
+									break
+								}
+						}
+						} else {
+							res := fmt.Sprintf("*2\r\n$%d\r\n%s\r\n", len(result[1]), result[1])
+							del := listData[result[1]][0]
+							cond.L.Lock()
+							listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
+							cond.L.Unlock()
+							res += fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)
+							c.Write([]byte(res))
+						}
+						
+					}
 				}
 			}
-			res := fmt.Sprintf("*2\r\n$%d\r\n%s\r\n", len(result[1]), result[1])
-			del := listData[result[1]][0]
-			listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
-			cond.L.Unlock()
-			res += fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)
-			c.Write([]byte(res))
-		}
-		
+		// 	} else if sec > 0{
+		// 		cond.L.Lock()
+		// 		for {
+		// 			if len(listData[result[1]]) == 0 || !status{
+		// 				cond.Wait()
+		// 			} else {
+		// 				break
+		// 			}
+		// 		}
+		// 		time.Sleep(time.Duration(sec) * time.Second)
+				
+		// 		status = true
+		// 		cond.Signal()
+		// 		cond.L.Unlock()
+		// 		res := fmt.Sprintf("*2\r\n$%d\r\n%s\r\n", len(result[1]), result[1])
+		// 		del := listData[result[1]][0]
+		// 		listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
+		// 		cond.L.Unlock()
+		// 		res += fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)
+		// 		c.Write([]byte(res))
+		// 	} else {
+		// 		c.Write([]byte("*-1\r\n"))
+		// 	}
+		// }
+
 	}
 }
 
