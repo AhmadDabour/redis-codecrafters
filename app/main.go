@@ -141,6 +141,15 @@ func handleConnection(c net.Conn) {
 			c.Write([]byte(fmt.Sprintf(":%d\r\n", len(listData[result[1]]))))
 		case "llen":
 			c.Write([]byte(fmt.Sprintf(":%d\r\n", len(listData[result[1]]))))
+		case "lpop":
+			if _, ok := listData[result[1]]; !ok {
+				c.Write([]byte("$-1\r\n"))
+			} else if len(listData[result[1]]) == 0 {
+				c.Write([]byte("$-1\r\n"))
+			}
+			del := listData[result[1]][0]
+			listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
+			c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)))
 		}
 	}
 }
