@@ -208,30 +208,6 @@ func handleConnection(c net.Conn) {
 					}
 				}
 			}
-		// 	} else if sec > 0{
-		// 		cond.L.Lock()
-		// 		for {
-		// 			if len(listData[result[1]]) == 0 || !status{
-		// 				cond.Wait()
-		// 			} else {
-		// 				break
-		// 			}
-		// 		}
-		// 		time.Sleep(time.Duration(sec) * time.Second)
-				
-		// 		status = true
-		// 		cond.Signal()
-		// 		cond.L.Unlock()
-		// 		res := fmt.Sprintf("*2\r\n$%d\r\n%s\r\n", len(result[1]), result[1])
-		// 		del := listData[result[1]][0]
-		// 		listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
-		// 		cond.L.Unlock()
-		// 		res += fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)
-		// 		c.Write([]byte(res))
-		// 	} else {
-		// 		c.Write([]byte("*-1\r\n"))
-		// 	}
-		// }
 
 	}
 }
