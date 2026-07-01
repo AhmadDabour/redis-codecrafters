@@ -18,6 +18,7 @@ var _ = os.Exit
 var varData = make(map[string]string)
 var listData = make(map[string][]string)
 var mu sync.Mutex
+var cond *sync.Cond = sync.NewCond(&mu)
 
 func main() {
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
@@ -96,6 +97,7 @@ func handleConnection(c net.Conn) {
 			for i := 2; i < len(result); i++ { 
 			listData[result[1]] = append(listData[result[1]], result[i])
 			}
+			cond.Signal()
 			mu.Unlock()
 			c.Write([]byte(fmt.Sprintf(":%d\r\n", len(listData[result[1]]))))
 		case "lrange":
@@ -161,6 +163,21 @@ func handleConnection(c net.Conn) {
 				listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
 				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)))
 		}
+		case "blpop":
+			cond.L.Lock()
+			for {
+				if len(listData[result[1]]) == 0 {
+					cond.Wait()
+				} else {
+					break
+				}
+			}
+			res := fmt.Sprintf("*2\r\n$%d\r\n%s\r\n", len(result[1]), result[1])
+			del := listData[result[1]][0]
+			listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
+			cond.L.Unlock()
+			res += fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)
+			c.Write([]byte(res))
 		}
 		
 	}
