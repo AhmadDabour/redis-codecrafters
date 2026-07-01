@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"reflect"
 )
 
 var _ = net.Listen
@@ -206,6 +207,14 @@ func handleConnection(c net.Conn) {
 						}
 						
 					}
+				}
+			case "type": 
+				if _, ok := varData[result[1]]; !ok     {
+					c.Write([]byte("+none\r\n"))
+				} else { 
+				listType := reflect.TypeOf(varData[result[1]])
+				t := listType.Kind()
+				c.Write([]byte(fmt.Sprintf("+%s\r\n", t)))
 				}
 			}
 
