@@ -105,10 +105,10 @@ func handleConnection(c net.Conn) {
 				upper = int64(len(listData[result[1]])) - 1
 			} else if int(((upper * -1) - 1)) >= len(listData[result[1]]) {
 				upper = 0
-				continue
 			}
 			if int(lower) > len(listData[result[1]]) {
 				c.Write([]byte("*0\r\n"))
+				continue
 			} else if int(((lower * -1) - 1)) >= len(listData[result[1]]) {
 				lower = 0
 			}
@@ -132,6 +132,13 @@ func handleConnection(c net.Conn) {
 				res += fmt.Sprintf("$%d\r\n%s\r\n", len(listData[result[1]][i]), listData[result[1]][i])
 			}
 			c.Write([]byte(res))
+		case "lpush":
+			mu.Lock()
+			for i := 2; i < len(result); i++ {
+				listData[result[1]] = append([]string{result[i]}, listData[result[1]]...)
+			}
+			mu.Unlock()
+			c.Write([]byte(fmt.Sprintf(":%d\r\n", len(listData[result[1]]))))
 		}
 	}
 }
