@@ -147,10 +147,22 @@ func handleConnection(c net.Conn) {
 			} else if len(listData[result[1]]) == 0 {
 				c.Write([]byte("$-1\r\n"))
 			}
-			del := listData[result[1]][0]
-			listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
-			c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)))
+			if len(result) >= 3 {
+				amount, _ := strconv.ParseInt(result[2], 10, 64)
+				res := fmt.Sprintf("*%d\r\n", amount)
+				for i := 0; i < int(amount); i++ {
+					del := listData[result[1]][0]
+					listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
+					res += fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)
+				}
+				c.Write([]byte(res))
+			} else { 
+				del := listData[result[1]][0]
+				listData[result[1]] = slices.Delete(listData[result[1]], 0, 1)
+				c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(del), del)))
 		}
+		}
+		
 	}
 }
 
